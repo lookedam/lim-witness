@@ -1,0 +1,58 @@
+{
+ "world": {
+  "schema": "lim.gatec.world-observation.v1",
+  "source_id": "github:LivesInMotion/lim-platform",
+  "event_id": "comment:6956247651",
+  "decision_id": "selftest-001",
+  "lineage": "lim-witness-selftest-20261117",
+  "epoch": 1,
+  "nonce": "c100a33d5bd8c768d388fe64226bd958",
+  "journal": {
+   "seq": 1,
+   "hash": "fdb6e26a6c7926961ed796b1ad2650dda8bd2fa07d64956a8c1888acc99aae74"
+  },
+  "registry": {
+   "seq": 1,
+   "hash": "dedfca64e0be6ef2efdff6cbcfbe6db29fc7c45ab6acb33cfc972eebc88f710a"
+  },
+  "observed_at_ms": 1794955191473,
+  "observed_world": {
+   "source": "github.issue_comment",
+   "repo": "LivesInMotion/lim-platform",
+   "comment_id": "6956247651",
+   "exists": true,
+   "issue_number": 1852,
+   "author": "ekijoyce",
+   "body_sha256": "0be9547dc7b7c10159a6f96ed460f9d2ecb33a2f21c8755ebba530a3d8e3b729",
+   "created_at": "2026-11-17T17:51:18Z",
+   "updated_at": "2026-11-17T17:51:18Z"
+  },
+  "observed_world_sha256": "69921bd35cbc50b0b6d81efc09d277f5cf702ca71772135f0e1c725f6d5a7869"
+ },
+ "anchor": {
+  "schema": "lim.gatec.external-highwater.v1",
+  "anchor_version": 1,
+  "lineage": "lim-witness-selftest-20261117",
+  "epoch": 1,
+  "nonce": "c100a33d5bd8c768d388fe64226bd958",
+  "decision_id": "selftest-001",
+  "status": "WORLD_MATCH",
+  "reason": "",
+  "journal": {
+   "seq": 1,
+   "hash": "fdb6e26a6c7926961ed796b1ad2650dda8bd2fa07d64956a8c1888acc99aae74"
+  },
+  "registry": {
+   "seq": 1,
+   "hash": "dedfca64e0be6ef2efdff6cbcfbe6db29fc7c45ab6acb33cfc972eebc88f710a"
+  },
+  "world_observation_sha256": "7dac65de19bafa079879a1679410876f9474963f4f29348ccacbb32c057caceb",
+  "issued_at_ms": 1794955191473,
+  "run": {
+   "id": "44192201786",
+   "attempt": "1",
+   "sha": "ca2a19cb21eb7d054ec991313d79caad74e3b3d8"
+  }
+ },
+ "github_oidc": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjM4ODI2YjE3LTZhMzAtNWY5Yi1iMTY5LThiZWI4MjAyZjcyMyIsInR5cCI6IkpXVCIsIng1dCI6InlrTmFZNHFNX3RhNGsyVGdaT0NFWUxrY1lsQSJ9.eyJhY3RvciI6ImVraWpveWNlIiwiYWN0b3JfaWQiOiIxNjAyNzczMTkiLCJhdWQiOiJsaW0td2l0bmVzczowYWRhZGIyYmM5NWUyMWFmMTgyMmJlZDY3OGVjMTRhYTBhY2EyMDc2NzE2MTViODQ2NmNkMzU1YzhlYjZiMTUxIiwiYmFzZV9yZWYiOiIiLCJjaGVja19ydW5faWQiOiIxMzQ0MjQyMzk0MzkiLCJldmVudF9uYW1lIjoiaXNzdWVzIiwiZXhwIjoxNzk0OTU1NDkxLCJoZWFkX3JlZiI6IiIsImlhdCI6MTc5NDk1NTE5MSwiaXNzIjoiaHR0cHM6Ly90b2tlbi5hY3Rpb25zLmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImpvYl93b3JrZmxvd19yZWYiOiJsb29rZWRhbS9saW0td2l0bmVzcy8uZ2l0aHViL3dvcmtmbG93cy93aXRuZXNzLnltbEByZWZzL2hlYWRzL21haW4iLCJqb2Jfd29ya2Zsb3dfc2hhIjoiY2EyYTE5Y2IyMWViN2QwNTRlYzk5MTMxM2Q3OWNhYWQ3NGUzYjNkOCIsImp0aSI6IjZhNGU4N2FlLTU0NjktNDUyZC05MDY4LTZlMzEzNmUwMzNiNyIsIm5iZiI6MTc5NDk1NDg5MSwicmVmIjoicmVmcy9oZWFkcy9tYWluIiwicmVmX3Byb3RlY3RlZCI6InRydWUiLCJyZWZfdHlwZSI6ImJyYW5jaCIsInJlcG9zaXRvcnkiOiJsb29rZWRhbS9saW0td2l0bmVzcyIsInJlcG9zaXRvcnlfaWQiOiIxNDYyMDIyOTQ3IiwicmVwb3NpdG9yeV9vd25lciI6Imxvb2tlZGFtIiwicmVwb3NpdG9yeV9vd25lcl9pZCI6IjM1NjEwODI1MCIsInJlcG9zaXRvcnlfdmlzaWJpbGl0eSI6InB1YmxpYyIsInJ1bl9hdHRlbXB0IjoiMSIsInJ1bl9pZCI6IjQ0MTkyMjAxNzg2IiwicnVuX251bWJlciI6IjEiLCJydW5uZXJfZW52aXJvbm1lbnQiOiJnaXRodWItaG9zdGVkIiwic2hhIjoiY2EyYTE5Y2IyMWViN2QwNTRlYzk5MTMxM2Q3OWNhYWQ3NGUzYjNkOCIsInN1YiI6InJlcG86bG9va2VkYW1AMzU2MTA4MjUwL2xpbS13aXRuZXNzQDE0NjIwMjI5NDc6cmVmOnJlZnMvaGVhZHMvbWFpbiIsIndvcmtmbG93Ijoid2l0bmVzcyIsIndvcmtmbG93X3JlZiI6Imxvb2tlZGFtL2xpbS13aXRuZXNzLy5naXRodWIvd29ya2Zsb3dzL3dpdG5lc3MueW1sQHJlZnMvaGVhZHMvbWFpbiIsIndvcmtmbG93X3NoYSI6ImNhMmExOWNiMjFlYjdkMDU0ZWM5OTEzMTNkNzljYWFkNzRlM2IzZDgifQ.XpESumoH0MXjkr_htw-qrZbTCm0M3I0dWr2AacPdAMvsAcNg46dOBAHdxpEEsFO-g_FAww_OYLtLROl5nFyO7u9WZjuBF45y7IgfT4oKpI27psQ8qEdnB-koTAYE8WKG9JMhQN5YySiEEKbVOM14XNC7ZymhZxQzqWrxMWSr7rKGI9dHDRVIhZPQ-bP1VS6pmu__PMa9DCtLHwkdgkNJrQM0XhfEccHY-ECTtG34dQyOvNnx9Db8HaJ68r_bz1rKZ-HI0imvwCFJADxX9RRN9ZAMpcGHxl0kpmhHPSzlKNqFXsLY6wa_JzWft0UFXNT03VkjrhXqCifQAZGDi_PLuQ"
+}
