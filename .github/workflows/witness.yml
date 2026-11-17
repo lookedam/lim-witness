@@ -1,0 +1,38 @@
+# Goes in lookedam/lim-witness at .github/workflows/witness.yml. No third-party actions; one job; serial runs.
+name: witness
+on:
+  workflow_dispatch:
+    inputs:
+      request:
+        description: "base64 claim (lim.gatec.shadow-claim.v1)"
+        required: true
+permissions:
+  contents: write     # only this repo: append records/ and highwater.json
+  id-token: write     # GitHub-signed OIDC token binding each record's hash
+concurrency:
+  group: witness
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out this repo (no third-party action)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
+      - name: Observe and witness
+        working-directory: w
+        env:
+          REQUEST: ${{ inputs.request }}
+          LIM_READ_TOKEN: ${{ secrets.LIM_READ_TOKEN }}
+        run: node witness.mjs
+      - name: Append the record
+        working-directory: w
+        run: |
+          git config user.name "lim-witness"
+          git config user.email "lim-witness@users.noreply.github.com"
+          git add records highwater.json
+          git commit -m "witness run ${GITHUB_RUN_ID}"
+          git push origin HEAD
