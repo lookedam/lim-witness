@@ -43,9 +43,9 @@ async function observeGithubComment(e, env) {
            body_sha256: sha256(j.body || ""), created_at: j.created_at, updated_at: j.updated_at };
 }
 
+// hw = the high-water of THIS claim's lineage only (each lineage is tracked separately; the verifier pins the lineage)
 function rollbackCheck(hw, c) {
-  if (!hw) return "";
-  if (hw.lineage !== c.lineage) return "LINEAGE_CHANGED";
+  if (!hw || !hw.journal) return "";
   if (c.epoch < hw.epoch) return "EPOCH_ROLLBACK";
   if (c.journal.seq <= hw.journal.seq)          // every decision advances the journal: blocks re-runs/replays of old claims
     return c.journal.seq === hw.journal.seq && c.journal.hash === hw.journal.hash ? "REPLAY_NOT_ADVANCED" : "JOURNAL_ROLLBACK";
@@ -66,11 +66,12 @@ async function oidc(audience, env) {
 
 export async function run(env = process.env, dir = ".") {
   const hwPath = `${dir}/highwater.json`;
-  const hw = existsSync(hwPath) ? JSON.parse(readFileSync(hwPath, "utf8")) : null;
-  const version = (hw ? hw.anchor_version : 0) + 1;
+  const all = existsSync(hwPath) ? JSON.parse(readFileSync(hwPath, "utf8")) : { anchor_version: 0, lineages: {} };
+  const version = all.anchor_version + 1;
   const now = () => Date.now();
   const [c, bad] = parseClaim(env.REQUEST);
   let world = null, status, reason = bad;
+  const hw = c && Object.prototype.hasOwnProperty.call(all.lineages, c.lineage) ? all.lineages[c.lineage] : null;
   if (c) {
     reason = rollbackCheck(hw, c);
     if (!reason) {
@@ -97,10 +98,9 @@ export async function run(env = process.env, dir = ".") {
   mkdirSync(`${dir}/records`, { recursive: true });
   writeFileSync(`${dir}/records/${String(version).padStart(8, "0")}.json`, JSON.stringify(record, null, 1) + "\n");
   // the high-water only moves forward, and only on a non-refused claim
-  const next = status === "REFUSED" && hw ? { ...hw, anchor_version: version }
-             : status === "REFUSED" ? { anchor_version: version, lineage: null, epoch: 0, journal: null, registry: null }
-             : { anchor_version: version, lineage: c.lineage, epoch: c.epoch, journal: c.journal, registry: c.registry };
-  writeFileSync(hwPath, JSON.stringify(next, null, 1) + "\n");
+  all.anchor_version = version;
+  if (status !== "REFUSED") all.lineages[c.lineage] = { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
+  writeFileSync(hwPath, JSON.stringify(all, null, 1) + "\n");
   console.log(JSON.stringify({ anchor_version: version, status, reason, record_sha256: recordSha }));
   return { version, status, reason, recordSha };
 }
