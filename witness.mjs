@@ -7,25 +7,32 @@
 // Output status is evidence only. It never grants Gate C or first30 credit by itself.
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { unseal } from "./seal.mjs";
+import { publicClaimProblem } from "./request.mjs";
 
 const canonical = v => v === null || typeof v !== "object" ? JSON.stringify(v)
   : Array.isArray(v) ? "[" + v.map(canonical).join(",") + "]"
   : "{" + Object.keys(v).sort().map(k => JSON.stringify(k) + ":" + canonical(v[k])).join(",") + "}";
 const sha256 = s => createHash("sha256").update(s, "utf8").digest("hex");
 const hex64 = s => typeof s === "string" && /^[a-f0-9]{64}$/.test(s);
-const text = s => typeof s === "string" && s.trim().length > 0 && s.length <= 160;
 const seq = v => Number.isSafeInteger(v) && v >= 0;
-const head = h => h && seq(h.seq) && hex64(h.hash) && Object.keys(h).length === 2;
 const API = process.env.WITNESS_API_BASE || "https://api.github.com";      // tests only override this
 const ALLOWED_REPOS = new Set(["LivesInMotion/lim-platform"]);
 
-function parseClaim(b64) {
+// v4 (18 Nov 2026, ChatGPT #6964656703): the public request carries the effect locator SEALED to the witness key
+// (seal.mjs); a plaintext `effect` is refused, so a request can never publish which private comment it concerns.
+function parseClaim(b64, env) {
   let c;
   try { c = JSON.parse(Buffer.from(b64 || "", "base64").toString("utf8")); } catch { return [null, "CLAIM_NOT_JSON"]; }
-  if (!c || c.schema !== "lim.gatec.shadow-claim.v1" || !text(c.decision_id) || !text(c.lineage) || !seq(c.epoch) ||
-      !hex64(c.expected_world_sha256) || !head(c.journal) || !head(c.registry) || !text(c.nonce) || !c.effect)
-    return [null, "CLAIM_MALFORMED"];
-  const e = c.effect;
+  if (c && typeof c === "object" && "effect" in c) return [null, "EFFECT_NOT_SEALED"];
+  // v4.1 (18 Nov, ChatGPT #6969066584): exact field allowlist + opaque ids only (same check the issuer runs pre-POST).
+  const problem = publicClaimProblem(c);
+  if (problem) return [null, problem];
+  if (!env.OBSERVER_X25519_PRIV) return [null, "OBSERVER_KEY_MISSING"];
+  let e;
+  try { e = unseal(c, env.OBSERVER_X25519_PRIV); } catch { return [null, "EFFECT_UNSEAL_FAILED"]; }
+  if (!e || typeof e !== "object") return [null, "EFFECT_UNSEAL_FAILED"];
+  c = { ...c, effect: e }; delete c.effect_sealed;
   if (e.kind !== "github_comment" || !ALLOWED_REPOS.has(e.repo) || !/^\d{6,12}$/.test(String(e.comment_id)))
     return [null, "EFFECT_SOURCE_NOT_SUPPORTED"];
   return [c, ""];
@@ -69,7 +76,7 @@ export async function run(env = process.env, dir = ".") {
   const all = existsSync(hwPath) ? JSON.parse(readFileSync(hwPath, "utf8")) : { anchor_version: 0, lineages: {} };
   const version = all.anchor_version + 1;
   const now = () => Date.now();
-  const [c, bad] = parseClaim(env.REQUEST);
+  const [c, bad] = parseClaim(env.REQUEST, env);
   let world = null, status, reason = bad;
   const hw = c && Object.prototype.hasOwnProperty.call(all.lineages, c.lineage) ? all.lineages[c.lineage] : null;
   if (c) {
@@ -79,11 +86,18 @@ export async function run(env = process.env, dir = ".") {
     }
   }
   const observed_at_ms = now();
-  const worldBody = world && { schema: "lim.gatec.world-observation.v1", source_id: "github:" + c.effect.repo,
-    event_id: "comment:" + world.comment_id, decision_id: c.decision_id, lineage: c.lineage, epoch: c.epoch,
+  // 17 Nov 2026 (ChatGPT #6963585255, privacy minimisation): the PUBLIC record carries no plaintext repo name, comment/issue
+  // number, author login or activity timestamps. The observed world appears only as its SHA-256 (high entropy: it includes
+  // the body hash and timestamps), which is all a verifier needs to compare with the claim's expected_world_sha256.
+  const worldSha = world && sha256(canonical(world));
+  const worldBody = world && { schema: "lim.gatec.world-observation.v1", source_id: "github.issue_comment",
+    event_id: "obs:" + worldSha.slice(0, 32), decision_id: c.decision_id, lineage: c.lineage, epoch: c.epoch,
     nonce: c.nonce, journal: c.journal, registry: c.registry, observed_at_ms,
-    observed_world: world, observed_world_sha256: sha256(canonical(world)) };
-  if (!reason) status = worldBody.observed_world_sha256 === c.expected_world_sha256 ? "WORLD_MATCH" : "FALSE_WORLD_POSTCONDITION";
+    observed_world_exists: world.exists, observed_world_sha256: worldSha };
+  // v4.1 (18 Nov, ChatGPT #6968077875): a digest match on an ABSENT provider object is never a match. Only an observed,
+  // existing provider effect whose hash equals the claim can be WORLD_MATCH (and so advance the floor).
+  if (!reason) status = world.exists === true && worldBody.observed_world_sha256 === c.expected_world_sha256
+    ? "WORLD_MATCH" : "FALSE_WORLD_POSTCONDITION";
   else status = "REFUSED";
   const anchorBody = { schema: "lim.gatec.external-highwater.v1", anchor_version: version,
     lineage: c ? c.lineage : null, epoch: c ? c.epoch : null, nonce: c ? c.nonce : null,
@@ -97,9 +111,13 @@ export async function run(env = process.env, dir = ".") {
   record.github_oidc = await oidc("lim-witness:" + recordSha, env);   // GitHub-signed: binds repo, workflow file SHA, run, record hash
   mkdirSync(`${dir}/records`, { recursive: true });
   writeFileSync(`${dir}/records/${String(version).padStart(8, "0")}.json`, JSON.stringify(record, null, 1) + "\n");
-  // the high-water only moves forward, and only on a non-refused claim
+  // Every observation/refusal gets a signed numbered record, but NEVER let a
+  // FALSE_WORLD_POSTCONDITION claim advance the trusted lineage high-water.
+  // Otherwise an issuer can submit a fabricated higher journal (e.g. seq=999),
+  // force FALSE_WORLD, and permanently lock out the true world at seq=6.
+  // Only independently observed WORLD_MATCH advances this trust floor.
   all.anchor_version = version;
-  if (status !== "REFUSED") all.lineages[c.lineage] = { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
+  if (status === "WORLD_MATCH") all.lineages[c.lineage] = { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
   writeFileSync(hwPath, JSON.stringify(all, null, 1) + "\n");
   console.log(JSON.stringify({ anchor_version: version, status, reason, record_sha256: recordSha }));
   return { version, status, reason, recordSha };
