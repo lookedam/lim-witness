@@ -22,12 +22,24 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
+      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. A floating clone of main
+      # could execute a later commit B while the record and OIDC token name event commit A. Fail closed BEFORE any
+      # provider read, record write, OIDC request or push; print a checkout receipt of the exact bytes that will run.
+      - name: Bind checkout to the event commit (fail closed)
+        working-directory: w
+        run: |
+          set -eu
+          head="$(git rev-parse HEAD)"
+          if [ "$head" != "$GITHUB_SHA" ]; then echo "CHECKOUT_NOT_EVENT_SHA head=$head event=$GITHUB_SHA"; exit 1; fi
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
+          for f in witness.mjs request.mjs seal.mjs; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
       - name: Observe and witness
         id: obs
         working-directory: w
         env:
           REQUEST: ${{ github.event.issue.body }}
           LIM_READ_TOKEN: ${{ secrets.LIM_READ_TOKEN }}
+          OBSERVER_X25519_PRIV: ${{ secrets.OBSERVER_X25519_PRIV }}
         run: node witness.mjs | tee ../result.json
       - name: Append the record
         working-directory: w
