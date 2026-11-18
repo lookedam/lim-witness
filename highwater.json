@@ -1,5 +1,5 @@
 {
- "anchor_version": 4,
+ "anchor_version": 5,
  "lineages": {
   "lim-witness-selftest-20261117": {
    "epoch": 1,
@@ -12,6 +12,18 @@
     "hash": "dedfca64e0be6ef2efdff6cbcfbe6db29fc7c45ab6acb33cfc972eebc88f710a"
    },
    "anchor_version": 3
+  },
+  "l-f955842204d19cad89b400924fe542c8": {
+   "epoch": 1,
+   "journal": {
+    "seq": 1,
+    "hash": "c6ff6e9405d721cc78c0c2af3fc61d409c2e8fb9f299a5d86b84de1b4529a769"
+   },
+   "registry": {
+    "seq": 1,
+    "hash": "9592bd6a68b6b2bcef9c2b4f26f939d69c1e36c96f1ad56aa574a56a8028982d"
+   },
+   "anchor_version": 5
   }
  }
 }
