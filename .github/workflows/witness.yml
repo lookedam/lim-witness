@@ -1,21 +1,27 @@
 # Goes in lookedam/lim-witness (PUBLIC repo) at .github/workflows/witness.yml.
 # Trigger: an issue opened by the LIM team account only; the issue body is the base64 claim (data only, never run as code).
+# v4.2 (ChatGPT #6979934937 G3): a second, OWNER-ONLY trigger: workflow_dispatch `close`, which writes one signed
+# LINEAGE_CLOSE record (close.mjs). Only accounts with write access can dispatch; the job also requires the actor and the
+# triggering actor to be the repository owner, and the OIDC token then attests event_name=workflow_dispatch + actor.
 # No third-party actions; no agent token; records hold opaque ids/hashes only (no message text, no personal data).
 name: witness
 on:
   issues:
     types: [opened]
-permissions:
-  contents: write     # append records/ and highwater.json in this repo only
-  id-token: write     # GitHub-signed OIDC token binding each record's hash
-  issues: write       # reply with the record id and close the request issue
+  workflow_dispatch:   # v4.2 rev 2: takes nothing from the operator; close.mjs can only repair the one pinned historical lineage.
+# v4.2 (ChatGPT #6980783831): least privilege per job. Workflow-level default is NOTHING; each job names its own scopes.
+permissions: {}
 concurrency:
   group: witness
   cancel-in-progress: false
 jobs:
   observe:
-    if: github.event.issue.user.login == 'ekijoyce'
+    if: github.event_name == 'issues' && github.event.issue.user.login == 'ekijoyce'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: write     # append records/ and highwater.json in this repo only
+      id-token: write     # GitHub-signed OIDC token binding each record's hash
+      issues: write       # reply with the record id and close the request issue
     timeout-minutes: 5
     steps:
       - name: Check out this repo (no third-party action)
@@ -32,7 +38,7 @@ jobs:
           head="$(git rev-parse HEAD)"
           if [ "$head" != "$GITHUB_SHA" ]; then echo "CHECKOUT_NOT_EVENT_SHA head=$head event=$GITHUB_SHA"; exit 1; fi
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
-          for f in witness.mjs request.mjs seal.mjs; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          for f in witness.mjs request.mjs seal.mjs close.mjs; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
       - name: Observe and witness
         id: obs
         working-directory: w
@@ -56,3 +62,40 @@ jobs:
         run: |
           gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body "$(cat result.json)"
           gh issue close "$N" -R "$GITHUB_REPOSITORY"
+  close:
+    if: github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write     # append the one close record + highwater.json
+      id-token: write     # GitHub-signed OIDC token binding the close record's hash
+    timeout-minutes: 5
+    steps:
+      - name: Check out this repo (no third-party action)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
+      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. A floating clone of main
+      # could execute a later commit B while the record and OIDC token name event commit A. Fail closed BEFORE any
+      # provider read, record write, OIDC request or push; print a checkout receipt of the exact bytes that will run.
+      - name: Bind checkout to the event commit (fail closed)
+        working-directory: w
+        run: |
+          set -eu
+          head="$(git rev-parse HEAD)"
+          if [ "$head" != "$GITHUB_SHA" ]; then echo "CHECKOUT_NOT_EVENT_SHA head=$head event=$GITHUB_SHA"; exit 1; fi
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
+          for f in witness.mjs request.mjs seal.mjs close.mjs; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+      - name: Close the lineage (owner only)
+        working-directory: w
+        env:
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: node close.mjs | tee ../result.json
+      - name: Append the close record
+        working-directory: w
+        run: |
+          git config user.name "lim-witness"
+          git config user.email "lim-witness@users.noreply.github.com"
+          git add records highwater.json
+          git commit -m "lineage close run ${GITHUB_RUN_ID}"
+          git push origin HEAD
