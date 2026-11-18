@@ -52,6 +52,8 @@ async function observeGithubComment(e, env) {
 
 // hw = the high-water of THIS claim's lineage only (each lineage is tracked separately; the verifier pins the lineage)
 function rollbackCheck(hw, c) {
+  // v4.2 (ChatGPT #6979934937 G3): a lineage closed by the owner's signed LINEAGE_CLOSE record is a permanent tombstone.
+  if (hw && hw.closed) return "LINEAGE_CLOSED";
   if (!hw || !hw.journal) return "";
   if (c.epoch < hw.epoch) return "EPOCH_ROLLBACK";
   if (c.journal.seq <= hw.journal.seq)          // every decision advances the journal: blocks re-runs/replays of old claims
@@ -102,8 +104,8 @@ export async function run(env = process.env, dir = ".") {
   const anchorBody = { schema: "lim.gatec.external-highwater.v1", anchor_version: version,
     lineage: c ? c.lineage : null, epoch: c ? c.epoch : null, nonce: c ? c.nonce : null,
     decision_id: c ? c.decision_id : null, status, reason,
-    journal: (status === "REFUSED" ? hw && hw.journal : c.journal) || null,
-    registry: (status === "REFUSED" ? hw && hw.registry : c.registry) || null,
+    journal: (status === "REFUSED" ? hw && (hw.closed ? hw.corrected_floor && hw.corrected_floor.journal : hw.journal) : c.journal) || null,
+    registry: (status === "REFUSED" ? hw && (hw.closed ? hw.corrected_floor && hw.corrected_floor.registry : hw.registry) : c.registry) || null,
     world_observation_sha256: worldBody ? sha256(canonical(worldBody)) : null, issued_at_ms: now(),
     run: { id: env.GITHUB_RUN_ID || null, attempt: env.GITHUB_RUN_ATTEMPT || null, sha: env.GITHUB_SHA || null } };
   const record = { world: worldBody, anchor: anchorBody };
@@ -117,7 +119,7 @@ export async function run(env = process.env, dir = ".") {
   // force FALSE_WORLD, and permanently lock out the true world at seq=6.
   // Only independently observed WORLD_MATCH advances this trust floor.
   all.anchor_version = version;
-  if (status === "WORLD_MATCH") all.lineages[c.lineage] = { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
+  if (status === "WORLD_MATCH" && !(hw && hw.closed)) all.lineages[c.lineage] = { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
   writeFileSync(hwPath, JSON.stringify(all, null, 1) + "\n");
   console.log(JSON.stringify({ anchor_version: version, status, reason, record_sha256: recordSha }));
   return { version, status, reason, recordSha };
