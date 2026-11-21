@@ -1,5 +1,5 @@
 {
- "anchor_version": 7,
+ "anchor_version": 8,
  "lineages": {
   "lim-witness-selftest-20261117": {
    "closed": true,
@@ -42,6 +42,16 @@
     "hash": "9592bd6a68b6b2bcef9c2b4f26f939d69c1e36c96f1ad56aa574a56a8028982d"
    },
    "anchor_version": 5
+  }
+ },
+ "ledger_heads": {
+  "lim-meryl-ledger-v1": {
+   "seq": 0,
+   "head": "0000000000000000000000000000000000000000000000000000000000000000",
+   "anchor_version": 8,
+   "request_ids": [
+    "n-e0b90f74eb9b6d5bff3c7a5e0fd3ffb1"
+   ]
   }
  }
 }
