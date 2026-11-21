@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { unseal } from "./seal.mjs";
 import { publicClaimProblem } from "./request.mjs";
+import { isLedgerBody, decideLedger } from "./ledger.mjs";   // v4.3 (source only): committer-ledger-head requests
 
 const canonical = v => v === null || typeof v !== "object" ? JSON.stringify(v)
   : Array.isArray(v) ? "[" + v.map(canonical).join(",") + "]"
@@ -73,11 +74,28 @@ async function oidc(audience, env) {
   return (await r.json()).value;
 }
 
-export async function run(env = process.env, dir = ".") {
+export async function run(env = process.env, dir = ".", clock = Date.now) {   // v4.3: clock injectable by tests only (the entry point passes none)
   const hwPath = `${dir}/highwater.json`;
   const all = existsSync(hwPath) ? JSON.parse(readFileSync(hwPath, "utf8")) : { anchor_version: 0, lineages: {} };
   const version = all.anchor_version + 1;
-  const now = () => Date.now();
+  const now = () => clock();
+  if (isLedgerBody(env.REQUEST)) {
+    // v4.3: a signed committer-ledger-head request. No provider read, no observer key, no read token. producers.json is
+    // owner-installed; if it is missing or unparsable every ledger request is REFUSED (LEDGER_PRODUCER_UNPINNED).
+    let producers = null;
+    try { producers = JSON.parse(readFileSync(`${dir}/producers.json`, "utf8")); } catch { producers = null; }
+    const run = { id: env.GITHUB_RUN_ID || null, attempt: env.GITHUB_RUN_ATTEMPT || null, sha: env.GITHUB_SHA || null };
+    const d = decideLedger(all, producers, env.REQUEST, now(), version, run);
+    const record = { ledger_head: d.anchorBody };
+    const recordSha = sha256(canonical(record));
+    record.github_oidc = await oidc("lim-witness:" + recordSha, env);
+    mkdirSync(`${dir}/records`, { recursive: true });
+    writeFileSync(`${dir}/records/${String(version).padStart(8, "0")}.json`, JSON.stringify(record, null, 1) + "\n");
+    all.anchor_version = version;
+    writeFileSync(hwPath, JSON.stringify(all, null, 1) + "\n");
+    console.log(JSON.stringify({ anchor_version: version, status: d.status, reason: d.reason, record_sha256: recordSha }));
+    return { version, status: d.status, reason: d.reason, recordSha };
+  }
   const [c, bad] = parseClaim(env.REQUEST, env);
   let world = null, status, reason = bad;
   const hw = c && Object.prototype.hasOwnProperty.call(all.lineages, c.lineage) ? all.lineages[c.lineage] : null;
