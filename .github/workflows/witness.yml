@@ -9,15 +9,86 @@ on:
   issues:
     types: [opened]
   workflow_dispatch:   # v4.2 rev 2: takes nothing from the operator; close.mjs can only repair the one pinned historical lineage.
+# v4.3 (source only, NOT installed): the observe job also serves signed committer-ledger-head requests (ledger.mjs +
+# owner-installed producers.json); the checkout receipt names their blobs too. v4.3 rev 2 (Gemini 20 Nov): an `admit` job
+# (admit.mjs, no contents write, outside the group) gates every issue; clone and push are pinned to refs/heads/main.
+# v4.3 rev 3 (round-2 W1/W2): runs bind to current main (event commit an ancestor, only records changed); a claim yields
+# only to a GENUINE in-flight head (one the pure ledger decision would accept now), so ledger-shaped junk cannot pause claims.
 # v4.2 (ChatGPT #6980783831): least privilege per job. Workflow-level default is NOTHING; each job names its own scopes.
 permissions: {}
-concurrency:
-  group: witness
-  cancel-in-progress: false
 jobs:
-  observe:
+  # v4.3 (Gemini 20 Nov finding 1): ADMISSION, outside the serialised group and with no contents write. A body that the
+  # pure decision would not accept (ledger: shape, pinned producer, signature, freshness, replay, prior == floor; claim:
+  # shape, no ledger head in flight, CLAIM_CAP_PER_HOUR) is closed with its reason: no record, no commit, no push, and it
+  # never enters (so can never cancel or delay a run in) the `witness` group.
+  admit:
     if: github.event_name == 'issues' && github.event.issue.user.login == 'ekijoyce'
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read      # clone this commit: highwater.json + producers.json + the code that decides
+      issues: write       # list the team's recent issues; close a NOT_ADMITTED request with its reason
+    timeout-minutes: 2
+    outputs:
+      admit: ${{ steps.adm.outputs.admit }}
+    steps:
+      - name: Check out this repo (no third-party action)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: git clone --filter=blob:none --branch main --single-branch "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
+      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. v4.3 rev 3 (round-2 W1): bind to
+      # the CURRENT main, but only if the event commit is its ancestor and nothing except records/ and highwater.json changed
+      # since: the executed code is byte-identical to the event's, and a queued run sees the latest floor instead of failing.
+      # Fail closed BEFORE any provider read, record write, OIDC request or push; print a receipt of the exact bytes that run.
+      - name: Bind checkout to the event commit (fail closed)
+        working-directory: w
+        run: |
+          set -eu
+          head="$(git rev-parse HEAD)"
+          if [ "$(git symbolic-ref -q HEAD || true)" != "refs/heads/main" ]; then echo "CHECKOUT_NOT_MAIN"; exit 1; fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "$head"; then echo "EVENT_SHA_NOT_ANCESTOR_OF_MAIN head=$head event=$GITHUB_SHA"; exit 1; fi
+          changed="$(git diff --name-only "$GITHUB_SHA" "$head" | grep -v -E '^(records/[0-9]{8}\.json|highwater\.json)$' || true)"
+          if [ -n "$changed" ]; then echo "CODE_CHANGED_SINCE_EVENT $changed"; exit 1; fi
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
+          for f in witness.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          echo "bound event=$GITHUB_SHA main=$head (only records/ and highwater.json differ)"
+      - name: Admit (no write to this repository)
+        id: adm
+        working-directory: w
+        env:
+          REQUEST: ${{ github.event.issue.body }}
+          N: ${{ github.event.issue.number }}
+          CREATED: ${{ github.event.issue.created_at }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          since="$(date -u -d "@$(( $(date -u -d "$CREATED" +%s) - 3600 ))" +%Y-%m-%dT%H:%M:%SZ)"
+          gh api "repos/$GITHUB_REPOSITORY/issues?state=all&creator=ekijoyce&since=$since&per_page=100" > ../recent.json || echo null > ../recent.json
+          node admit.mjs admit ../recent.json | tee ../admit.json
+          echo "admit=$(node -p 'JSON.parse(require("fs").readFileSync("../admit.json","utf8")).admit===true')" >> "$GITHUB_OUTPUT"
+      - name: Close a request that was not admitted (no record, no commit)
+        if: steps.adm.outputs.admit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body "$(cat admit.json)"
+          gh issue close "$N" -R "$GITHUB_REPOSITORY"
+      - name: Close a request whose admission failed (no record, no commit)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          N: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body '{"schema":"lim.witness.admission.v1","admit":false,"reason":"ADMIT_RUN_FAILED"}'
+          gh issue close "$N" -R "$GITHUB_REPOSITORY"
+  observe:
+    needs: admit
+    if: github.event_name == 'issues' && github.event.issue.user.login == 'ekijoyce' && needs.admit.outputs.admit == 'true'
+    runs-on: ubuntu-24.04
+    concurrency:          # v4.3: job level; only ADMITTED requests ever enter (or wait in) this group
+      group: witness
+      cancel-in-progress: false
+      queue: max          # FIFO, up to 100 pending: a later run never cancels a pending one (challenger D4)
     permissions:
       contents: write     # append records/ and highwater.json in this repo only
       id-token: write     # GitHub-signed OIDC token binding each record's hash
@@ -25,22 +96,43 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out this repo (no third-party action)
+        timeout-minutes: 1
         env:
           GH_TOKEN: ${{ github.token }}
-        run: git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
-      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. A floating clone of main
-      # could execute a later commit B while the record and OIDC token name event commit A. Fail closed BEFORE any
-      # provider read, record write, OIDC request or push; print a checkout receipt of the exact bytes that will run.
+        run: git clone --filter=blob:none --branch main --single-branch "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
+      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. v4.3 rev 3 (round-2 W1): bind to
+      # the CURRENT main, but only if the event commit is its ancestor and nothing except records/ and highwater.json changed
+      # since: the executed code is byte-identical to the event's, and a queued run sees the latest floor instead of failing.
+      # Fail closed BEFORE any provider read, record write, OIDC request or push; print a receipt of the exact bytes that run.
       - name: Bind checkout to the event commit (fail closed)
+        timeout-minutes: 1
         working-directory: w
         run: |
           set -eu
           head="$(git rev-parse HEAD)"
-          if [ "$head" != "$GITHUB_SHA" ]; then echo "CHECKOUT_NOT_EVENT_SHA head=$head event=$GITHUB_SHA"; exit 1; fi
+          if [ "$(git symbolic-ref -q HEAD || true)" != "refs/heads/main" ]; then echo "CHECKOUT_NOT_MAIN"; exit 1; fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "$head"; then echo "EVENT_SHA_NOT_ANCESTOR_OF_MAIN head=$head event=$GITHUB_SHA"; exit 1; fi
+          changed="$(git diff --name-only "$GITHUB_SHA" "$head" | grep -v -E '^(records/[0-9]{8}\.json|highwater\.json)$' || true)"
+          if [ -n "$changed" ]; then echo "CODE_CHANGED_SINCE_EVENT $changed"; exit 1; fi
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
-          for f in witness.mjs request.mjs seal.mjs close.mjs; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          for f in witness.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          echo "bound event=$GITHUB_SHA main=$head (only records/ and highwater.json differ)"
+      - name: Yield early to an in-flight ledger head (claims only; no write)
+        id: y0
+        timeout-minutes: 1
+        working-directory: w
+        env:
+          REQUEST: ${{ github.event.issue.body }}
+          N: ${{ github.event.issue.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api "repos/$GITHUB_REPOSITORY/issues?state=open&creator=ekijoyce&per_page=100" > ../open0.json || echo null > ../open0.json
+          node admit.mjs yield ../open0.json | tee ../yield.json
+          echo "yield=$(node -p 'JSON.parse(require("fs").readFileSync("../yield.json","utf8")).yield===true')" >> "$GITHUB_OUTPUT"
       - name: Observe and witness
         id: obs
+        if: steps.y0.outputs.yield != 'true'
         working-directory: w
         env:
           REQUEST: ${{ github.event.issue.body }}
@@ -48,23 +140,33 @@ jobs:
           OBSERVER_X25519_PRIV: ${{ secrets.OBSERVER_X25519_PRIV }}
         run: node witness.mjs | tee ../result.json
       - name: Append the record
+        if: steps.y0.outputs.yield != 'true'
         working-directory: w
         run: |
+          set -eu
           git config user.name "lim-witness"
           git config user.email "lim-witness@users.noreply.github.com"
           git add records highwater.json
           git commit -m "witness issue ${{ github.event.issue.number }} run ${GITHUB_RUN_ID}"
-          git push origin HEAD
+          # v4.3 (Gemini 20 Nov finding 2): pinned destination; a non-fast-forward or refused push is a deterministic stop
+          if ! git push --porcelain origin HEAD:refs/heads/main > ../push.txt 2>&1; then
+            echo "WITNESS_PUSH_REJECTED: nothing was published (non-fast-forward or refused)"; cat ../push.txt; exit 1; fi
       - name: Answer and close the request
         env:
           GH_TOKEN: ${{ github.token }}
           N: ${{ github.event.issue.number }}
+          YIELDED: ${{ steps.y0.outputs.yield }}
         run: |
-          gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body "$(cat result.json)"
+          if [ "$YIELDED" = "true" ]; then out=yield.json; else out=result.json; fi
+          gh issue comment "$N" -R "$GITHUB_REPOSITORY" --body "$(cat "$out")"
           gh issue close "$N" -R "$GITHUB_REPOSITORY"
   close:
     if: github.event_name == 'workflow_dispatch' && github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
     runs-on: ubuntu-24.04
+    concurrency:
+      group: witness
+      cancel-in-progress: false
+      queue: max
     permissions:
       contents: write     # append the one close record + highwater.json
       id-token: write     # GitHub-signed OIDC token binding the close record's hash
@@ -73,18 +175,23 @@ jobs:
       - name: Check out this repo (no third-party action)
         env:
           GH_TOKEN: ${{ github.token }}
-        run: git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
-      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. A floating clone of main
-      # could execute a later commit B while the record and OIDC token name event commit A. Fail closed BEFORE any
-      # provider read, record write, OIDC request or push; print a checkout receipt of the exact bytes that will run.
+        run: git clone --filter=blob:none --branch main --single-branch "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" w
+      # v4.1 (ChatGPT #6972051113): the code that runs MUST be the code the event/OIDC attests. v4.3 rev 3 (round-2 W1): bind to
+      # the CURRENT main, but only if the event commit is its ancestor and nothing except records/ and highwater.json changed
+      # since: the executed code is byte-identical to the event's, and a queued run sees the latest floor instead of failing.
+      # Fail closed BEFORE any provider read, record write, OIDC request or push; print a receipt of the exact bytes that run.
       - name: Bind checkout to the event commit (fail closed)
         working-directory: w
         run: |
           set -eu
           head="$(git rev-parse HEAD)"
-          if [ "$head" != "$GITHUB_SHA" ]; then echo "CHECKOUT_NOT_EVENT_SHA head=$head event=$GITHUB_SHA"; exit 1; fi
+          if [ "$(git symbolic-ref -q HEAD || true)" != "refs/heads/main" ]; then echo "CHECKOUT_NOT_MAIN"; exit 1; fi
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" "$head"; then echo "EVENT_SHA_NOT_ANCESTOR_OF_MAIN head=$head event=$GITHUB_SHA"; exit 1; fi
+          changed="$(git diff --name-only "$GITHUB_SHA" "$head" | grep -v -E '^(records/[0-9]{8}\.json|highwater\.json)$' || true)"
+          if [ -n "$changed" ]; then echo "CODE_CHANGED_SINCE_EVENT $changed"; exit 1; fi
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
-          for f in witness.mjs request.mjs seal.mjs close.mjs; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          for f in witness.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          echo "bound event=$GITHUB_SHA main=$head (only records/ and highwater.json differ)"
       - name: Close the lineage (owner only)
         working-directory: w
         env:
@@ -94,8 +201,11 @@ jobs:
       - name: Append the close record
         working-directory: w
         run: |
+          set -eu
           git config user.name "lim-witness"
           git config user.email "lim-witness@users.noreply.github.com"
           git add records highwater.json
           git commit -m "lineage close run ${GITHUB_RUN_ID}"
-          git push origin HEAD
+          # v4.3 (Gemini 20 Nov finding 2): pinned destination; a non-fast-forward or refused push is a deterministic stop
+          if ! git push --porcelain origin HEAD:refs/heads/main > ../push.txt 2>&1; then
+            echo "WITNESS_PUSH_REJECTED: nothing was published (non-fast-forward or refused)"; cat ../push.txt; exit 1; fi
