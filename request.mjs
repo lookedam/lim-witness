@@ -24,8 +24,31 @@ export const CLAIM_KEYS = ["schema", "decision_id", "lineage", "epoch", "expecte
   "nonce", "effect_sealed"];
 const SEAL_KEYS = ["alg", "epk", "iv", "ct", "tag"];
 
+// v4.4 CANDIDATE (22 Nov, ChatGPT #1738 c7071952135; NOT INSTALLED): schema v2 adds an `auth` block that the witness
+// verifies against the owner-pinned world producer trust root BEFORE any floor mutation (world_auth.mjs).
+export const CLAIM_KEYS_V2 = [...CLAIM_KEYS, "auth"];
+export const AUTH_KEYS = ["issuer_key_id", "issuer_epoch", "actor_key_id", "actor_epoch", "task_ref", "nonce_commit",
+  "pre_digest", "pre_sig", "seal_digest", "seal_sig", "decision_digest", "decision_sig", "pre_ack", "seal_ack", "core_sig"];
+const hex = (s, n) => typeof s === "string" && new RegExp(`^[a-f0-9]{${n}}$`).test(s);
+export function authShapeProblem(a) {
+  if (!exactKeys(a, AUTH_KEYS)) return "AUTH_FIELDS_NOT_ALLOWLISTED";
+  if (![a.issuer_key_id, a.actor_key_id].every(k => hex(k, 32)) || !seq(a.issuer_epoch) || !seq(a.actor_epoch)) return "AUTH_MALFORMED";
+  if (!/^t-[a-f0-9]{32}$/.test(a.task_ref)) return "AUTH_TASK_REF_NOT_OPAQUE";
+  if (![a.nonce_commit, a.pre_digest, a.seal_digest, a.decision_digest].every(h => hex(h, 64))) return "AUTH_MALFORMED";
+  if (![a.pre_sig, a.seal_sig, a.decision_sig, a.core_sig].every(h => hex(h, 128))) return "AUTH_MALFORMED";
+  const ackOk = h => exactKeys(h, ["seq", "head"]) && seq(h.seq) && hex64(h.head);
+  if (!ackOk(a.pre_ack) || !ackOk(a.seal_ack)) return "AUTH_MALFORMED";
+  return "";
+}
+
 // Shape check shared by issuer (pre-POST) and witness (on receipt). Returns "" or a refusal code.
 export function publicClaimProblem(c) {
+  if (c && c.schema === "lim.gatec.shadow-claim.v2") {
+    if (!exactKeys(c, CLAIM_KEYS_V2)) return "CLAIM_FIELDS_NOT_ALLOWLISTED";
+    const ap = authShapeProblem(c.auth); if (ap) return ap;
+    const { auth, schema, ...rest } = c;
+    return publicClaimProblem({ ...rest, schema: "lim.gatec.shadow-claim.v1" });
+  }
   if (!exactKeys(c, CLAIM_KEYS)) return "CLAIM_FIELDS_NOT_ALLOWLISTED";
   if (c.schema !== "lim.gatec.shadow-claim.v1") return "CLAIM_MALFORMED";
   if (!OPAQUE.decision.test(c.decision_id) || !OPAQUE.lineage.test(c.lineage) || !OPAQUE.nonce.test(c.nonce))
@@ -62,4 +85,16 @@ export function assertPublicSafe(body) {
 export async function postRequest(body, send) {
   assertPublicSafe(body);
   return send({ title: "LIM Gate C witness request", body });
+}
+
+// v4.4 CANDIDATE: v2 request. `auth` is built by the Issuer (world_auth.mjs buildAuth) and is part of the seal AAD.
+export function buildRequestV2({ ids, epoch, expected_world_sha256, journal, registry, effect, auth }, observerPubPem) {
+  const claim = { schema: "lim.gatec.shadow-claim.v2", decision_id: ids.decision_id, lineage: ids.lineage, epoch,
+    expected_world_sha256, journal: { seq: journal.seq, hash: journal.hash }, registry: { seq: registry.seq, hash: registry.hash },
+    nonce: ids.nonce, auth };
+  const effectOnly = { kind: effect.kind, repo: effect.repo, comment_id: String(effect.comment_id) };
+  claim.effect_sealed = seal(effectOnly, claim, observerPubPem);
+  const body = Buffer.from(JSON.stringify(claim), "utf8").toString("base64");
+  assertPublicSafe(body);
+  return body;
 }
