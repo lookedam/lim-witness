@@ -10,6 +10,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { unseal } from "./seal.mjs";
 import { publicClaimProblem } from "./request.mjs";
 import { isLedgerBody, decideLedger } from "./ledger.mjs";   // v4.3 (source only): committer-ledger-head requests
+import { worldAuthGate, worldPin } from "./world_auth.mjs";  // v4.4 CANDIDATE (not installed): pre-advance auth gate
 
 const canonical = v => v === null || typeof v !== "object" ? JSON.stringify(v)
   : Array.isArray(v) ? "[" + v.map(canonical).join(",") + "]"
@@ -99,6 +100,22 @@ export async function run(env = process.env, dir = ".", clock = Date.now) {   //
   const [c, bad] = parseClaim(env.REQUEST, env);
   let world = null, status, reason = bad;
   const hw = c && Object.prototype.hasOwnProperty.call(all.lineages, c.lineage) ? all.lineages[c.lineage] : null;
+  // v4.4 CANDIDATE (ChatGPT #1738 c7071952135 gap 1): a v2 claim, or any claim naming an owner-pinned world lineage, must
+  // pass the auth gate AND the rollback/fork check BEFORE anything is written. Failure => NOT_ADMITTED: no record number,
+  // no record, no highwater write (byte-for-byte unchanged). Legacy v1 claims on unpinned lineages behave exactly as v4.3.
+  let producersW = null;
+  try { producersW = JSON.parse(readFileSync(`${dir}/producers.json`, "utf8")); } catch { producersW = null; }
+  let raw = null;
+  try { raw = JSON.parse(Buffer.from(env.REQUEST || "", "base64").toString("utf8")); } catch { raw = null; }
+  const protectedClaim = !!(raw && typeof raw === "object" && (raw.schema === "lim.gatec.shadow-claim.v2" || worldPin(producersW, raw.lineage)));
+  const notAdmitted = why => { console.log(JSON.stringify({ status: "NOT_ADMITTED", reason: why })); return { version: null, status: "NOT_ADMITTED", reason: why, recordSha: null }; };
+  let gate = { problem: "", pinned: false };
+  if (protectedClaim) {
+    if (!c) return notAdmitted(bad || "CLAIM_MALFORMED");
+    gate = worldAuthGate(c, producersW, hw, dir);
+    if (!gate.problem) gate.problem = rollbackCheck(hw, c);
+    if (gate.problem) return notAdmitted(gate.problem);
+  }
   if (c) {
     reason = rollbackCheck(hw, c);
     if (!reason) {
@@ -119,6 +136,13 @@ export async function run(env = process.env, dir = ".", clock = Date.now) {   //
   if (!reason) status = world.exists === true && worldBody.observed_world_sha256 === c.expected_world_sha256
     ? "WORLD_MATCH" : "FALSE_WORLD_POSTCONDITION";
   else status = "REFUSED";
+  // v4.4 CANDIDATE: on a pinned lineage the witness itself enforces the actor and the anchored order
+  //   own PRE ACK < own SEAL ACK < provider created_at < this provider read (observed_at_ms)
+  if (status === "WORLD_MATCH" && gate.pinned) {
+    const created = Date.parse(world.created_at);
+    if (world.author !== gate.actor.login) { status = "FALSE_WORLD_POSTCONDITION"; reason = "WORLD_ACTOR_MISMATCH"; }
+    else if (!(created > gate.sealAckMs) || !(observed_at_ms > created)) { status = "FALSE_WORLD_POSTCONDITION"; reason = "WORLD_TEMPORAL_ORDER"; }
+  }
   const anchorBody = { schema: "lim.gatec.external-highwater.v1", anchor_version: version,
     lineage: c ? c.lineage : null, epoch: c ? c.epoch : null, nonce: c ? c.nonce : null,
     decision_id: c ? c.decision_id : null, status, reason,
@@ -137,7 +161,10 @@ export async function run(env = process.env, dir = ".", clock = Date.now) {   //
   // force FALSE_WORLD, and permanently lock out the true world at seq=6.
   // Only independently observed WORLD_MATCH advances this trust floor.
   all.anchor_version = version;
-  if (status === "WORLD_MATCH" && !(hw && hw.closed)) all.lineages[c.lineage] = { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
+  if (status === "WORLD_MATCH" && !(hw && hw.closed)) all.lineages[c.lineage] = gate.pinned
+    ? { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version,
+        decisions: [...((hw && hw.decisions) || []), c.auth.decision_digest], nonce_commits: [...((hw && hw.nonce_commits) || []), c.auth.nonce_commit] }
+    : { epoch: c.epoch, journal: c.journal, registry: c.registry, anchor_version: version };
   writeFileSync(hwPath, JSON.stringify(all, null, 1) + "\n");
   console.log(JSON.stringify({ anchor_version: version, status, reason, record_sha256: recordSha }));
   return { version, status, reason, recordSha };
