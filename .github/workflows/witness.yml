@@ -49,7 +49,7 @@ jobs:
           changed="$(git diff --name-only "$GITHUB_SHA" "$head" | grep -v -E '^(records/[0-9]{8}\.json|highwater\.json)$' || true)"
           if [ -n "$changed" ]; then echo "CODE_CHANGED_SINCE_EVENT $changed"; exit 1; fi
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
-          for f in witness.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          for f in witness.mjs world_auth.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
           echo "bound event=$GITHUB_SHA main=$head (only records/ and highwater.json differ)"
       - name: Admit (no write to this repository)
         id: adm
@@ -115,7 +115,7 @@ jobs:
           changed="$(git diff --name-only "$GITHUB_SHA" "$head" | grep -v -E '^(records/[0-9]{8}\.json|highwater\.json)$' || true)"
           if [ -n "$changed" ]; then echo "CODE_CHANGED_SINCE_EVENT $changed"; exit 1; fi
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
-          for f in witness.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          for f in witness.mjs world_auth.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
           echo "bound event=$GITHUB_SHA main=$head (only records/ and highwater.json differ)"
       - name: Yield early to an in-flight ledger head (claims only; no write)
         id: y0
@@ -190,7 +190,7 @@ jobs:
           changed="$(git diff --name-only "$GITHUB_SHA" "$head" | grep -v -E '^(records/[0-9]{8}\.json|highwater\.json)$' || true)"
           if [ -n "$changed" ]; then echo "CODE_CHANGED_SINCE_EVENT $changed"; exit 1; fi
           if [ -n "$(git status --porcelain --untracked-files=all)" ]; then echo "WORKTREE_NOT_CLEAN"; exit 1; fi
-          for f in witness.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
+          for f in witness.mjs world_auth.mjs request.mjs seal.mjs close.mjs ledger.mjs admit.mjs producers.json; do echo "ran $f blob=$(git rev-parse "HEAD:$f") sha256=$(sha256sum "$f" | cut -c1-64)"; done
           echo "bound event=$GITHUB_SHA main=$head (only records/ and highwater.json differ)"
       - name: Close the lineage (owner only)
         working-directory: w
