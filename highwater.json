@@ -1,5 +1,5 @@
 {
- "anchor_version": 31,
+ "anchor_version": 32,
  "lineages": {
   "lim-witness-selftest-20261117": {
    "closed": true,
@@ -70,9 +70,9 @@
  },
  "ledger_heads": {
   "lim-meryl-ledger-v1": {
-   "seq": 26,
-   "head": "92099b6f628cf5d6dfdc628bbc1585a50e5fba1f672a91e70c2f076ee610a724",
-   "anchor_version": 31,
+   "seq": 27,
+   "head": "157db350e3679f6dc0c0150c8c94c9860dc70e0b351039875b581653d861f874",
+   "anchor_version": 32,
    "request_ids": [
     "n-e0b90f74eb9b6d5bff3c7a5e0fd3ffb1",
     "n-1966ef2f0a497dd085e6c4df02e1dc5c",
@@ -93,7 +93,8 @@
     "n-7d775c7d63ddd8a8d358c7912c1b91b8",
     "n-8a46686bfc5a5f74475b8465d646c9d2",
     "n-4fb8e0d4ca853a6c4b9883a2ec5cc0e3",
-    "n-003308e0b07b5218d01258324dc9f15b"
+    "n-003308e0b07b5218d01258324dc9f15b",
+    "n-1f2985f896c12710a89bd3793a8a6ebf"
    ]
   }
  }
