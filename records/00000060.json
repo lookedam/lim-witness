@@ -1,0 +1,48 @@
+{
+ "world": {
+  "schema": "lim.gatec.world-observation.v1",
+  "source_id": "github.issue_comment",
+  "event_id": "obs:9eceff24024ba66e98aae7a2a8fb6704",
+  "decision_id": "d-be0020a089e79fa6be8b435abaddb327",
+  "lineage": "l-06e9348c67132e00c01e26f632c03435",
+  "epoch": 1,
+  "nonce": "n-2c4712408e2beec8751ff5a745ff204f",
+  "journal": {
+   "hash": "fea5a180c8d7a2257436cfe2bcac6a428932eef69e7ce4073633ed3926546478",
+   "seq": 91
+  },
+  "registry": {
+   "hash": "f2fd0b99af7583dabf5c82bfbe3647a2f0c3cbb7300e561253dd1ab3d96985d5",
+   "seq": 2
+  },
+  "observed_at_ms": 1795781933080,
+  "observed_world_exists": true,
+  "observed_world_sha256": "9eceff24024ba66e98aae7a2a8fb6704b7ecd690e4a306b6d908e5df9c483d40"
+ },
+ "anchor": {
+  "schema": "lim.gatec.external-highwater.v1",
+  "anchor_version": 60,
+  "lineage": "l-06e9348c67132e00c01e26f632c03435",
+  "epoch": 1,
+  "nonce": "n-2c4712408e2beec8751ff5a745ff204f",
+  "decision_id": "d-be0020a089e79fa6be8b435abaddb327",
+  "status": "WORLD_MATCH",
+  "reason": "",
+  "journal": {
+   "hash": "fea5a180c8d7a2257436cfe2bcac6a428932eef69e7ce4073633ed3926546478",
+   "seq": 91
+  },
+  "registry": {
+   "hash": "f2fd0b99af7583dabf5c82bfbe3647a2f0c3cbb7300e561253dd1ab3d96985d5",
+   "seq": 2
+  },
+  "world_observation_sha256": "dfa10287201b66025d7ddf4bd0054ea03fd3fd301cde09b4598f35411c7e78f5",
+  "issued_at_ms": 1795781933080,
+  "run": {
+   "id": "45997538960",
+   "attempt": "1",
+   "sha": "5651ecd4ff4973e939fc9d960e7630665c4a8f54"
+  }
+ },
+ "github_oidc": "eyJhbGciOiJSUzI1NiIsImtpZCI6IjM4ODI2YjE3LTZhMzAtNWY5Yi1iMTY5LThiZWI4MjAyZjcyMyIsInR5cCI6IkpXVCIsIng1dCI6InlrTmFZNHFNX3RhNGsyVGdaT0NFWUxrY1lsQSJ9.eyJhY3RvciI6ImVraWpveWNlIiwiYWN0b3JfaWQiOiIxNjAyNzczMTkiLCJhdWQiOiJsaW0td2l0bmVzczplZTE1YmJmZWFhZDlmNzQ1YmViYzYyN2QzNTc3MWFmNzAwZjFiNjA1NjI0ODhkMWMyZjU2ZjcwZTc0OTUwOWUwIiwiYmFzZV9yZWYiOiIiLCJjaGVja19ydW5faWQiOiIxNDA1MDA3MjQ2NjEiLCJldmVudF9uYW1lIjoiaXNzdWVzIiwiZXhwIjoxNzk1NzgyMjMzLCJoZWFkX3JlZiI6IiIsImlhdCI6MTc5NTc4MTkzMywiaXNzIjoiaHR0cHM6Ly90b2tlbi5hY3Rpb25zLmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImpvYl93b3JrZmxvd19yZWYiOiJsb29rZWRhbS9saW0td2l0bmVzcy8uZ2l0aHViL3dvcmtmbG93cy93aXRuZXNzLnltbEByZWZzL2hlYWRzL21haW4iLCJqb2Jfd29ya2Zsb3dfc2hhIjoiNTY1MWVjZDRmZjQ5NzNlOTM5ZmM5ZDk2MGU3NjMwNjY1YzRhOGY1NCIsImp0aSI6ImFjYzZkMzU2LWZjNGQtNDcyNS1iZjhmLWVhY2I4ZDBjOTZjMSIsIm5iZiI6MTc5NTc4MTYzMywicmVmIjoicmVmcy9oZWFkcy9tYWluIiwicmVmX3Byb3RlY3RlZCI6InRydWUiLCJyZWZfdHlwZSI6ImJyYW5jaCIsInJlcG9zaXRvcnkiOiJsb29rZWRhbS9saW0td2l0bmVzcyIsInJlcG9zaXRvcnlfaWQiOiIxNDYyMDIyOTQ3IiwicmVwb3NpdG9yeV9vd25lciI6Imxvb2tlZGFtIiwicmVwb3NpdG9yeV9vd25lcl9pZCI6IjM1NjEwODI1MCIsInJlcG9zaXRvcnlfdmlzaWJpbGl0eSI6InB1YmxpYyIsInJ1bl9hdHRlbXB0IjoiMSIsInJ1bl9pZCI6IjQ1OTk3NTM4OTYwIiwicnVuX251bWJlciI6IjYwIiwicnVubmVyX2Vudmlyb25tZW50IjoiZ2l0aHViLWhvc3RlZCIsInNoYSI6IjU2NTFlY2Q0ZmY0OTczZTkzOWZjOWQ5NjBlNzYzMDY2NWM0YThmNTQiLCJzdWIiOiJyZXBvOmxvb2tlZGFtQDM1NjEwODI1MC9saW0td2l0bmVzc0AxNDYyMDIyOTQ3OnJlZjpyZWZzL2hlYWRzL21haW4iLCJ3b3JrZmxvdyI6IndpdG5lc3MiLCJ3b3JrZmxvd19yZWYiOiJsb29rZWRhbS9saW0td2l0bmVzcy8uZ2l0aHViL3dvcmtmbG93cy93aXRuZXNzLnltbEByZWZzL2hlYWRzL21haW4iLCJ3b3JrZmxvd19zaGEiOiI1NjUxZWNkNGZmNDk3M2U5MzlmYzlkOTYwZTc2MzA2NjVjNGE4ZjU0In0.kKS09v9n6sUsb2gXyfVlJsCJBMHSsn4tLwtojSLTBxod3V0mIfBXtUDt3nzRy-zybzFph2y07hiNYOj2Fg4-Ej-3K4BwN5YoQKVggILUfIiUhi8RFlvUqRX2m0P-qO5dm74U_w0Bq_5CWrJeA1mwK3gAWYmKbyGXbENV2eCEuFDNMVo_u_9oYxDTc7jP6uzkkLLddhRBn_NojYty8IYjGaWJc2Jca0B0xF6x2obBqF3UlujOjFDK1SAMBZubOYQteYn-ikrduEcXPlWBhMRgnntXVDiOKvJqqnG6yIEqdYDossTT1haIwWr-NHoVcq-Jod39b-o8mVViBXxK3jghCg"
+}

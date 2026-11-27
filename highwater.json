@@ -1,5 +1,5 @@
 {
- "anchor_version": 59,
+ "anchor_version": 60,
  "lineages": {
   "lim-witness-selftest-20261117": {
    "closed": true,
@@ -46,14 +46,14 @@
   "l-06e9348c67132e00c01e26f632c03435": {
    "epoch": 1,
    "journal": {
-    "hash": "2d0649e7f04b930a35f916d50148e95f68a20d2dedaedef90e862bf5613777a2",
-    "seq": 86
+    "hash": "fea5a180c8d7a2257436cfe2bcac6a428932eef69e7ce4073633ed3926546478",
+    "seq": 91
    },
    "registry": {
     "hash": "f2fd0b99af7583dabf5c82bfbe3647a2f0c3cbb7300e561253dd1ab3d96985d5",
     "seq": 2
    },
-   "anchor_version": 56,
+   "anchor_version": 60,
    "decisions": [
     "fb7325d9bad557e42ab16222e6d5a3f5e5079ec6da2025bd28787f7022310752",
     "e577ff7d1a62b09a2a2a760d3b220cfff49c3045ea406d0a99763f0d5ed5ebd5",
@@ -64,7 +64,8 @@
     "ff5440542bcdde5ef9e168527ed69be854470bd9c547992559f5e6df9a301cd6",
     "c18edfa24bb882fbd1bea0bad5c2e299ea68dc88cea401b7c00b20bbf1e49768",
     "ffcbab3386417f9e6dae172115eb305ac85965145bafd34637cb57f82466ea06",
-    "6d7c5e66e9f66fc3d9f10c87951a7997878718c06c76dc6d33fb2219dfe55503"
+    "6d7c5e66e9f66fc3d9f10c87951a7997878718c06c76dc6d33fb2219dfe55503",
+    "ef7d16ccbf182bc033613183a1bb25cead58eefa4c850849cc8081b35088e660"
    ],
    "nonce_commits": [
     "942649dff7a907e3f5f651b3476d3c0b5225d484067ef991460c6f32661e0417",
@@ -76,7 +77,8 @@
     "12c4af7a34515cf8dffa5f842c3ecfc029f559c2a3332aec91f007e734158b05",
     "87095b8273ee832569ddb73685d396e0f1b3c11fed54ce02922778198682fe1e",
     "8e516c2b0203594d451af52c6c0bc93f7975f78fc80c0a2f9086da85162e65eb",
-    "8f492b6b7fdbaeba4cf6582ee1cfdfe9a892839ec43727379ecb6c59731db153"
+    "8f492b6b7fdbaeba4cf6582ee1cfdfe9a892839ec43727379ecb6c59731db153",
+    "724c181bd1ccf12ba3c884bc1090b5f064484db866e83e3986b8fb2899e290df"
    ]
   }
  },
